@@ -292,11 +292,29 @@ export async function sendProactiveMedia(
       return { ok: false, error: "Failed to upload media" };
     }
 
-    const token = await getAccessToken(config, log);
     const { targetId, isExplicitUser } = stripTargetPrefix(target);
     const resolvedTarget = resolveOriginalPeerId(targetId);
     const isGroup = !isExplicitUser && resolvedTarget.startsWith("cid");
 
+    // For image type, try card mode first if configured.
+    if (mediaType === "image") {
+      const messageType = config.messageType || "markdown";
+      if (messageType === "card" && config.cardTemplateId) {
+        log?.debug?.(
+          `[DingTalk] Using card API for proactive image to ${isGroup ? "group" : "user"} ${resolvedTarget}`,
+        );
+        const markdownImage = `![](${mediaId})`;
+        const result = await sendProactiveCardText(config, resolvedTarget, markdownImage, log);
+        if (result.ok) {
+          return { ok: true, data: result };
+        }
+        log?.warn?.(
+          `[DingTalk] Card image send failed, falling back to sampleImageMsg: ${result.error}`,
+        );
+      }
+    }
+
+    const token = await getAccessToken(config, log);
     const dingtalkApi = "https://api.dingtalk.com";
     const url = isGroup
       ? `${dingtalkApi}/v1.0/robot/groupMessages/send`
