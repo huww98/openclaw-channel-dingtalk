@@ -124,14 +124,6 @@ function shouldSendProactivePermissionHint(params: {
   return true;
 }
 
-function isUnhandledStopReasonText(value: string): boolean {
-  const normalized = value.trim();
-  if (!normalized) {
-    return false;
-  }
-  return /^Unhandled stop reason:\s*[A-Za-z0-9_-]+/i.test(normalized);
-}
-
 /**
  * Download DingTalk media file via runtime media service (sandbox-compatible).
  * Files are stored in the global media inbound directory.
@@ -1165,11 +1157,6 @@ export async function handleDingTalkMessage(params: HandleDingTalkMessageParams)
                 return;
               }
 
-              if (typeof textToSend === "string" && isUnhandledStopReasonText(textToSend)) {
-                log?.warn?.(`[DingTalk] Suppressed stop reason from outbound chat content: ${textToSend}`);
-                return;
-              }
-
               if (useCardMode && currentAICard && info?.kind === "final") {
                 finalContent.push(textToSend);
                 return;
@@ -1281,14 +1268,6 @@ export async function handleDingTalkMessage(params: HandleDingTalkMessageParams)
 
         const finalText = queuedFinal ? finalContent.map(v => v.trim()).filter(v => v.length > 0).join("\n\n") : 
           currentAICard.lastStreamedContent || "✅ Done";
-        if (isUnhandledStopReasonText(finalText)) {
-          log?.warn?.(
-            `[DingTalk] Suppressed stop reason from AI Card final content: ${finalText}`,
-          );
-          currentAICard.state = AICardStatus.FINISHED;
-          currentAICard.lastUpdated = Date.now();
-          return;
-        }
         await finishAICard(currentAICard, finalText, log);
       } catch (err: any) {
         log?.debug?.(`[DingTalk] AI Card finalization failed: ${err.message}`);
